@@ -1,3 +1,4 @@
+import { TextField } from "./components";
 import { Greeting } from "./state/greetings";
 import { Context } from "./state/window";
 
@@ -5,11 +6,12 @@ window.addEventListener("DOMContentLoaded", main);
 
 
 function main() {
-    const listeners = [
+    const registers = [
         Greeting(document),
-        Context(document)
+        Context(document),
+        TextField
     ];
 
     // Register elements
-    listeners.forEach(v => v.Register())
+    registers.forEach(v => v.Register())
 }
