@@ -1,9 +1,8 @@
 import { TextField } from "./components";
-import { Greeting } from "./state/greetings";
-import { Context } from "./state/window";
+import { Greeting, Context } from "./state";
+
 
 window.addEventListener("DOMContentLoaded", main);
-
 
 function main() {
     const registers = [
