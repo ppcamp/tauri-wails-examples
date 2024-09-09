@@ -10,7 +10,7 @@ UBUNTU_FOCAL_FIXER = Types: deb \n\
 					 Components: main restricted \n\
 					 Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 UBUNTU_FIXER_FILE = /etc/apt/sources.list.d/tauri.sources
-F=cross-installer
+F=ui
 RELEASE_FOLDER=$(F)/src-tauri/target/release
 
 
