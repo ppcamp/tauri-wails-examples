@@ -1,5 +1,5 @@
 # https://docs.github.com/en/actions/writing-workflows/workflow-syntax-for-github-actions
-name: 'multi-builder'
+name: 'multi-builder-vanilla'
 
 on:
   push:
@@ -51,11 +51,11 @@ jobs:
       - name: rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: './ui/src-tauri -> target'
+          workspaces: './vanilla/src-tauri -> target'
 
       - name: install frontend dependencies
         # If you don't have `beforeBuildCommand` configured you may want to build your frontend here too.
-        run: cd ui && npm install
+        run: cd vanilla && npm install
 
       - name: execute tauri bundler command
       # https://github.com/tauri-apps/tauri-action/blob/dev/examples/publish-to-manual-release.yml
@@ -63,7 +63,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          projectPath: 'ui'
+          projectPath: 'vanilla'
           tagName: app-v__VERSION__ # the action automatically replaces \_\_VERSION\_\_ with the app version.
           releaseName: 'App v__VERSION__'
           releaseBody: 'See the assets to download this version and install.'
