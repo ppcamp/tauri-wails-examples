@@ -28,10 +28,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up GitHub CLI
-        run: sudo apt install -y gh
-
       - name: Set up tag short variable
+        shell: bash
         id: vars
         run: echo "TAG=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
@@ -46,7 +44,7 @@ jobs:
 
 
 
-  publish-tauri-svelte:
+  publish-tauri:
     needs: [release]  # This job depends on 'release'
     permissions:
       contents: write
@@ -68,6 +66,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up tag short variable
+        shell: bash
         id: vars
         run: echo "TAG=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
@@ -86,23 +85,27 @@ jobs:
           cache: 'npm'
           cache-dependency-path: tauri-svelte/package-lock.json
 
-      - name: install frontend dependencies
+      - name: Install frontend dependencies (svelte)
         working-directory: tauri-svelte
         run: npm install
 
-      - name: install rust stable
+      - name: Install frontend dependencies (vanilla)
+        working-directory: tauri-vanilla
+        run: npm install
+
+      - name: Install rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
           # Those targets are only used on macos runners so it's in an `if`
           # to slightly speed up windows and linux builds.
           targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
-      - name: rust cache
+      - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
           workspaces: './tauri-svelte/src-tauri -> target'
 
-      - name: execute tauri bundler command
+      - name: Execute Tauri Bundler (svelte)
       # https://github.com/tauri-apps/tauri-action/blob/dev/examples/publish-to-manual-release.yml
         uses: tauri-apps/tauri-action@v0
         with:
@@ -114,6 +117,17 @@ jobs:
           prerelease: false
           args: ${{ matrix.args }}
 
+      - name: Execute Tauri Bundler (vanilla)
+      # https://github.com/tauri-apps/tauri-action/blob/dev/examples/publish-to-manual-release.yml
+        uses: tauri-apps/tauri-action@v0
+        with:
+          projectPath: 'tauri-vanilla'
+          tagName: ${{ steps.vars.outputs.TAG }} # the action automatically replaces \_\_VERSION\_\_ with the app version.
+          releaseName: Release ${{ steps.vars.outputs.TAG }}
+          releaseBody: 'See the assets to download this version and install.'
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}
 
 
   publish-wails:
@@ -151,7 +165,7 @@ jobs:
             app-working-directory: wails-svelte
             build-name: ${{ matrix.build.name }}
             build-platform: ${{ matrix.build.platform }}
-            package: false
+            package: true
             go-version: '1.23'
             node-version: '22.8'
 
@@ -165,15 +179,19 @@ jobs:
             sudo apt install nfpm
             make wails-ship-debian
 
-        - name: Set up GitHub CLI
-          run: sudo apt install -y gh
-
         - name: Set up tag short variable
+          shell: bash
           id: vars
           run: echo "TAG=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
         - name: Upload deb file
+          if:  matrix.build.platform == 'linux/amd64'
           working-directory: wails-svelte
           run: gh release upload $TAG build/bin/*.deb
           env:
             TAG: ${{ steps.vars.outputs.TAG }}
+
+        - name: Upload exe file
+          if:  matrix.build.platform == 'windows/amd64'
+          working-directory: wails-svelte
+          run: gh release upload ${{ steps.vars.outputs.TAG }} build/bin/wails-svelte-amd64-installer.exe
