@@ -1,0 +1,8 @@
+[Desktop Entry]
+Categories=Office
+Exec=/usr/bin/wails-open-file %u
+Icon=wails-open-file.png
+Name=wails-open-file
+Terminal=false
+Type=Application
+MimeType=x-scheme-handler/myapp;

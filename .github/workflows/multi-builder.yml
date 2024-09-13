@@ -1,23 +1,63 @@
+# Builds and packages all versions of the specified subprojects
+#
+# This action assumes that no release will be created for elements with errors
+#
 # https://docs.github.com/en/actions/writing-workflows/workflow-syntax-for-github-actions
 name: 'multi-builder'
 
 on:
   push:
     branches:
-      - release
+      - release* # Match any branch that has release syntax
+    # tags:
+    #   - '*' # Match any new tag
+
+env:
+  # Necessary for most environments as build failure can occur due to OOM issues
+  NODE_OPTIONS: "--max-old-space-size=4096"
+  GH_TOKEN: ${{ github.token }}
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
-  publish-tauri:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up GitHub CLI
+        run: sudo apt install -y gh
+
+      - name: Set up tag short variable
+        id: vars
+        run: echo "TAG=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Create release and tag
+        id: release
+        run: |
+          git tag "$TAG" && git push origin tag "$TAG"
+          gh release create "$TAG" -d --title "Release $TAG" --generate-notes -F CHANGELOG.md
+
+        env:
+          TAG: ${{ steps.vars.outputs.TAG }}
+
+
+
+  publish-tauri-svelte:
+    needs: [release]  # This job depends on 'release'
     permissions:
       contents: write
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         include:
           - platform: 'ubuntu-22.04' # for Tauri v1 you could replace this with ubuntu-20.04.
             args: ''
-          - platform: 'windows-latest'
-            args: ''
+          # - platform: 'windows-latest'
+          #   args: ''
           # - platform: 'macos-latest' # for Arm based macs (M1 and above).
           #   args: '--target aarch64-apple-darwin'
           # - platform: 'macos-latest' # for Intel based macs.
@@ -27,7 +67,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: install OS dependencies (ubuntu only)
+      - name: Set up tag short variable
+        id: vars
+        run: echo "TAG=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Install OS dependencies (ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
@@ -35,11 +79,16 @@ jobs:
         # webkitgtk 4.0 is for Tauri v1 - webkitgtk 4.1 is for Tauri v2.
         # You can remove the one that doesn't apply to your app to speed up the workflow a bit.
 
-      - name: setup node
+      - name: Set up node
         uses: actions/setup-node@v4
         with:
-          node-version: lts/*
+          node-version: '22.8'
           cache: 'npm'
+          cache-dependency-path: tauri-svelte/package-lock.json
+
+      - name: install frontend dependencies
+        working-directory: tauri-svelte
+        run: npm install
 
       - name: install rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -51,22 +100,80 @@ jobs:
       - name: rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: './ui/src-tauri -> target'
-
-      - name: install frontend dependencies
-        # If you don't have `beforeBuildCommand` configured you may want to build your frontend here too.
-        run: cd ui && npm install
+          workspaces: './tauri-svelte/src-tauri -> target'
 
       - name: execute tauri bundler command
       # https://github.com/tauri-apps/tauri-action/blob/dev/examples/publish-to-manual-release.yml
         uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          projectPath: 'ui'
-          tagName: app-v__VERSION__ # the action automatically replaces \_\_VERSION\_\_ with the app version.
-          releaseName: 'App v__VERSION__'
+          projectPath: 'tauri-svelte'
+          tagName: ${{ steps.vars.outputs.TAG }} # the action automatically replaces \_\_VERSION\_\_ with the app version.
+          releaseName: Release ${{ steps.vars.outputs.TAG }}
           releaseBody: 'See the assets to download this version and install.'
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+
+
+
+  publish-wails:
+      needs: [release]  # This job depends on 'release'
+
+      permissions:
+        contents: write
+
+      strategy:
+        fail-fast: true # Failure in one platform build won't impact the others
+        matrix:
+          build:
+            - name: 'wails-svelte'
+              platform:  'linux/amd64'
+              os: 'ubuntu-22.04'
+            # - name: 'wails-svelte'
+            #   platform:  'windows/amd64'
+            #   os: 'windows-latest'
+            # - name: 'wails-svelte'
+            #   platform:  'darwin/universal'
+            #   os: 'macos-latest'
+
+      runs-on: ${{ matrix.build.os }}
+
+      steps:
+        - name: Checkout
+          uses: actions/checkout@v4
+          with:
+            submodules: recursive
+
+        - name: Build wails
+          uses: dAppServer/wails-build-action@v2.2
+          id: build
+          with:
+            app-working-directory: wails-svelte
+            build-name: ${{ matrix.build.name }}
+            build-platform: ${{ matrix.build.platform }}
+            package: false
+            go-version: '1.23'
+            node-version: '22.8'
+
+        - name: Set up nfpm packages
+          if:  matrix.build.platform == 'linux/amd64'
+          working-directory: wails-svelte
+          run: |
+            echo 'Matrix ${{ matrix.platform }}'
+            echo 'deb [trusted=yes] https://repo.goreleaser.com/apt/ /' | sudo tee /etc/apt/sources.list.d/goreleaser.list
+            sudo apt update
+            sudo apt install nfpm
+            make wails-ship-debian
+
+        - name: Set up GitHub CLI
+          run: sudo apt install -y gh
+
+        - name: Set up tag short variable
+          id: vars
+          run: echo "TAG=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+        - name: Upload deb file
+          working-directory: wails-svelte
+          run: gh release upload $TAG build/bin/*.deb
+          env:
+            TAG: ${{ steps.vars.outputs.TAG }}
