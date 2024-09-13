@@ -1,0 +1,31 @@
+name: "wails-svelte"
+arch: "amd64"
+platform: "linux"
+version: "1.0.0"
+section: "default"
+priority: "extra"
+maintainer: "PPcamp <p.augustocampos@gmail.com>"
+description: "Sample Package"
+vendor: "PPcamp"
+homepage: "http://example.com"
+license: "MIT"
+
+contents:
+  - src: ../bin/wails-svelte
+    dst: /usr/bin/wails-svelte
+  - src: ./main.desktop
+    dst: /usr/share/applications/wails-svelte.desktop
+  - src: ../appicon.png # or svg as well
+    dst: /usr/share/icons/hicolor/scalable/apps/wails-svelte.svg
+  # copy icons to Yaru theme as well. For some reason Ubuntu didn't pick up fileicons from hicolor theme
+  - src: ../appicon.png
+    dst: /usr/share/icons/Yaru/scalable/apps/wails-svelte.svg
+
+scripts:
+  postinstall: ./postInstall.sh
+  postremove: ./postRemove.sh
+
+# Optional: dependencies for the package
+depends:
+  - libc6
+  - libstdc++6
