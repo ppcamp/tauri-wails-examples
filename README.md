@@ -10,7 +10,7 @@ using vanilla web elements and svelte 5 preview.
 
 In this case, to run in development mode, per example,
 you need to type for vanilla
-`make vanilla-run` or `make svelte-run`.
+`make tauri-vanilla-run` or `make tauri-svelte-run`.
 
 
 <!--
