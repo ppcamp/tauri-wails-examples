@@ -13,6 +13,8 @@ you need to type for vanilla
 `make tauri-vanilla-run` or `make tauri-svelte-run`.
 
 
+> All those svelte versions were upgraded to svelte 5 beta verison
+
 <!--
 Special thanks to https://github.com/stevemao/github-issue-templates/tree/master
 -->
