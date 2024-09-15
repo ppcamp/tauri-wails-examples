@@ -1,10 +1,9 @@
 <script lang="ts">
-  let count = $state(0)
-  const increment = () => {
-    count += 1
-  }
+    import { Counter } from "../utils/Counter.svelte";
+
+    let count = new Counter();
 </script>
 
-<button onclick={increment}>
-  count is {count}
+<button onclick={count.Increment}>
+  count is {count.Name}
 </button>
